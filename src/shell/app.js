@@ -88,7 +88,11 @@ export class App {
   /** Загрузить сцену проекта в движок */
   _loadScene(data) {
     const engine = this.engine;
+    // Порядок важен: выгружаем старую сцену и чистим физический мир ДО
+    // десериализации. Компоненты регистрируются в физике при включении, и
+    // clear() после deserialize стёр бы уже зарегистрированные коллайдеры.
     engine.scene?.unload();
+    engine.physics.clear?.();
     let scene = null;
     if (data && data.objects?.length) {
       try { scene = Scene.deserialize(data, engine); }
@@ -99,7 +103,6 @@ export class App {
       scene.engine = engine;
     }
     scene.physics = engine.physics;
-    engine.physics.clear?.();
     engine.loadScene(scene);
   }
 

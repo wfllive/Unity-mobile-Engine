@@ -51,7 +51,8 @@ export class Rigidbody extends Component {
   set position(v) { this.transform.position = v; }
   get speed() { return this.velocity.length(); }
 
-  awake() { this.engine?.physics?.addBody(this); }
+  onEnable() { this.engine?.physics?.addBody(this); }
+  onDisable() { this.engine?.physics?.removeBody(this); }
   onDestroy() { this.engine?.physics?.removeBody(this); }
 
   addForce(force, mode = 'force') {
@@ -130,9 +131,19 @@ export class Collider extends Component {
 
   awake() {
     this.attachedRigidbody = this.getComponent(Rigidbody) ?? this.getComponentInParent(Rigidbody);
+    this.updateBounds();
+  }
+  // Регистрация именно в onEnable/onDisable (контракт Unity): awake срабатывает
+  // один раз, поэтому после physics.clear() при перезапуске сцены коллайдер
+  // больше не вернулся бы в мир — и объекты проваливались бы сквозь пол.
+  onEnable() {
+    if (!this.attachedRigidbody) {
+      this.attachedRigidbody = this.getComponent(Rigidbody) ?? this.getComponentInParent(Rigidbody);
+    }
     this.engine?.physics?.addCollider(this);
     this.updateBounds();
   }
+  onDisable() { this.engine?.physics?.removeCollider(this); }
   onDestroy() { this.engine?.physics?.removeCollider(this); }
 
   updateBounds() { /* переопределяется */ }
