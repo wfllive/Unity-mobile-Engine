@@ -1,0 +1,26 @@
+{
+  "name": "unity-mobile-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "WFL Engine - Unity-подобный игровой движок на three.js для браузера и мобильных, со своей сборкой APK без Gradle",
+  "scripts": {
+    "dev": "node tools/build-runtime.mjs && vite --host 0.0.0.0 --port 3000",
+    "build": "node tools/build-runtime.mjs && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "apk": "node tools/cli.mjs apk",
+    "build:runtime": "node tools/build-runtime.mjs",
+    "test": "node tools/test/run-all.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "vite": "^5.4.11"
+  },
+  "bin": {
+    "wfl": "tools/cli.mjs"
+  }
+}

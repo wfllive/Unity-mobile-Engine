@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>WFL Engine</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0b0e14; color: #e6e6e6;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none; user-select: none;
+      overscroll-behavior: none; touch-action: none;
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; outline: none; }
+
+    /* Экран загрузки */
+    #boot {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 22px;
+      background: radial-gradient(circle at 50% 40%, #16202e 0%, #0b0e14 70%);
+      transition: opacity .45s ease;
+    }
+    #boot.hidden { opacity: 0; pointer-events: none; }
+    .boot-logo {
+      font-size: 40px; font-weight: 800; letter-spacing: 6px;
+      background: linear-gradient(90deg, #4fc3f7, #a78bfa, #4fc3f7);
+      background-size: 200% auto;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+      animation: shine 3s linear infinite;
+    }
+    @keyframes shine { to { background-position: 200% center; } }
+    .boot-sub { font-size: 12px; color: #64748b; letter-spacing: 2px; text-transform: uppercase; }
+    .boot-bar { width: 230px; height: 3px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+    .boot-fill {
+      height: 100%; width: 0%; border-radius: 3px;
+      background: linear-gradient(90deg, #4fc3f7, #a78bfa);
+      transition: width .3s ease;
+    }
+    .boot-status { font-size: 11px; color: #475569; height: 14px; }
+
+    /* Стартовое меню */
+    #menu {
+      position: fixed; inset: 0; z-index: 90;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(11, 14, 20, .82); backdrop-filter: blur(8px);
+    }
+    #menu.hidden { display: none; }
+    #menu h1 { font-size: 30px; font-weight: 800; letter-spacing: 3px; margin-bottom: 4px; }
+    #menu p { font-size: 12px; color: #64748b; margin-bottom: 18px; max-width: 300px; text-align: center; line-height: 1.6; }
+    .btn {
+      min-width: 210px; padding: 13px 22px; border: 0; border-radius: 10px;
+      font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+      background: #1e293b; color: #e2e8f0;
+      transition: transform .12s ease, background .2s ease;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn.primary { background: linear-gradient(135deg, #4fc3f7, #a78bfa); color: #08111c; }
+    .btn:hover { background: #273449; }
+    .btn.primary:hover { filter: brightness(1.08); background: linear-gradient(135deg, #4fc3f7, #a78bfa); }
+    .hint { position: fixed; bottom: 14px; font-size: 10px; color: #334155; letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="menu" class="hidden">
+    <h1>WFL ENGINE</h1>
+    <p>Игровой движок на three.js с редактором сцен и сборкой APK прямо из браузера.</p>
+    <button class="btn primary" id="btn-play">Играть</button>
+    <button class="btn" id="btn-editor">Открыть редактор</button>
+    <button class="btn" id="btn-apk">Собрать APK</button>
+    <div class="hint">WASD / мышь — движение · на мобильных — виртуальные стики</div>
+  </div>
+
+  <div id="boot">
+    <div class="boot-logo">WFL</div>
+    <div class="boot-sub">Game Engine</div>
+    <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
+    <div class="boot-status" id="boot-status">инициализация…</div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

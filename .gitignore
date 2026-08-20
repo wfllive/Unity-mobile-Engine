@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.vite/
+.DS_Store
+*.log
+npm-debug.log*
+
+# Сгенерированные артефакты сборки APK
+src/apk/runtime-bundle.js
+*.apk
+*.keystore
+*.pem
+out/
