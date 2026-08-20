@@ -10,7 +10,10 @@
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "apk": "node tools/cli.mjs apk",
     "build:runtime": "node tools/build-runtime.mjs --force",
-    "test": "node tools/test/run-all.mjs"
+    "test": "node tools/test/run-all.mjs",
+    "doctor": "node tools/doctor.mjs",
+    "predev": "node tools/doctor.mjs",
+    "prebuild": "node tools/doctor.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.2",
