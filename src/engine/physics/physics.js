@@ -276,16 +276,25 @@ export class PhysicsWorld extends EventEmitter {
 
   /** Проверка перемещения капсулы (для контроллера персонажа) */
   computePenetration(collider, position, iterations = 4) {
+    // position часто передают как collider.worldCenter, а updateBounds()
+    // ниже пишет в worldCenter — без копии аргумент мутировал бы прямо
+    // посреди цикла и смещения накапливались бы квадратично.
+    const origin = position.clone();
     const correction = new THREE.Vector3();
+    const probe = new THREE.Vector3();
     for (let i = 0; i < iterations; i++) {
       let hitAny = false;
-      collider.updateBounds(position.clone().add(correction));
+      probe.copy(origin).add(correction);
+      collider.updateBounds(probe);
       for (const other of this.colliders) {
         if (other === collider || !other.enabled || other.isTrigger) continue;
         if (!this._layersCollide(collider.gameObject?.layer ?? 0, other.gameObject?.layer ?? 0)) continue;
-        const m = testCollision(collider, other, position.clone().add(correction));
+        const m = testCollision(collider, other, probe.clone());
         if (m && m.depth > 0.0001) {
-          correction.addScaledVector(m.normal, m.depth * (m.a === collider ? 1 : -1));
+          // normal направлена от m.a к m.b. Чтобы вытолкнуть collider из
+          // препятствия, двигаться нужно ПРОТИВ нормали, когда collider — это
+          // m.a (и по нормали, когда он оказался вторым операндом).
+          correction.addScaledVector(m.normal, m.depth * (m.a === collider ? -1 : 1));
           hitAny = true;
         }
       }

@@ -16,9 +16,12 @@ export class AudioManager {
   }
 
   init() {
-    if (this.context) return this;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) { console.warn('[Audio] WebAudio недоступен'); return this; }
+    if (this.context || this._unavailable) return this;
+    // Движок должен работать и без WebAudio (SSR, тесты, старые webview):
+    // помечаем аудио недоступным один раз, чтобы не спамить в каждом кадре.
+    const g = typeof window !== 'undefined' ? window : undefined;
+    const AC = g && (g.AudioContext || g.webkitAudioContext);
+    if (!AC) { this._unavailable = true; console.warn('[Audio] WebAudio недоступен'); return this; }
     this.context = new AC();
     this.master = this.context.createGain();
     this.master.gain.value = this.volume;

@@ -546,9 +546,15 @@ export class CharacterController extends Component {
     }
 
     t.position = pos;
-    // разрешение проникновений
-    const corr = physics.computePenetration(this._collider, this._collider.worldCenter);
-    if (corr.lengthSq() > 0) { t.position = t.position.add(corr); }
+    // Разрешение проникновений. Пересчитываем bounds от НОВОЙ позиции: иначе
+    // worldCenter остаётся с прошлого кадра, и на больших dt (лаг-спайк)
+    // выталкивание считается от устаревшей точки — персонаж застревает в полу.
+    this._collider.updateBounds();
+    const corr = physics.computePenetration(this._collider, this._collider.worldCenter.clone());
+    if (corr.lengthSq() > 0) {
+      t.position = t.position.add(corr);
+      this._collider.updateBounds();
+    }
     this._checkGround(physics);
     return this.collisionFlags;
   }
