@@ -274,9 +274,27 @@ export class FollowCamera extends Component {
     this.target = null;
     this._vel = new THREE.Vector3();
   }
-  start() { if (!this.target && this.targetName) this.target = this.find(this.targetName)?.transform ?? null; }
+  start() { this._resolveTarget(); }
+
+  /**
+   * Найти цель: по имени, иначе — объект с тегом Player.
+   * Прямая ссылка на Transform не переживает сериализацию, поэтому после
+   * загрузки сцены цель приходится искать заново.
+   */
+  _resolveTarget() {
+    if (this.target) return this.target;
+    if (this.targetName) {
+      this.target = this.find(this.targetName)?.transform ?? null;
+      if (this.target) return this.target;
+    }
+    const player = this.scene?.findByTag?.('Player');
+    this.target = player?.transform ?? null;
+    return this.target;
+  }
+
   lateUpdate(dt) {
-    if (!this.target) return;
+    // Цель могла появиться позже (например, игрок создан спавнером)
+    if (!this.target && !this._resolveTarget()) return;
     const desired = this.target.position.clone().add(this.offset.clone().applyQuaternion(this.target.rotation));
     const cur = this.transform.position;
     const k = 1 - Math.exp(-dt / Math.max(0.0001, this.smoothTime));

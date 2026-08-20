@@ -71,12 +71,9 @@ ${c.bold('Примеры:')}
 
 /* ------------------------- команды ------------------------- */
 async function cmdApk() {
-  // Проверяем, что рантайм собран
-  const bundlePath = resolve(root, 'src/apk/runtime-bundle.js');
-  if (!existsSync(bundlePath)) {
-    console.log(c.yellow('Рантайм не собран, запускаю сборку…'));
-    await import('./build-runtime.mjs');
-  }
+  // Рантайм собирается при необходимости (нет файла или исходники новее)
+  const { buildRuntime } = await import('./build-runtime.mjs');
+  await buildRuntime({ quiet: true });
 
   const { buildApk } = await import('../src/apk/builder.js');
   const { buildRuntimeHtml } = await import('../src/apk/runtime-html.js');

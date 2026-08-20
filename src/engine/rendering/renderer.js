@@ -6,12 +6,17 @@ export const QualityLevel = {
   VeryLow: 0, Low: 1, Medium: 2, High: 3, Ultra: 4,
 };
 
+// PCFSoftShadowMap объявлен устаревшим в three r18x: рендерер сам заменяет его
+// на PCFShadowMap и пишет предупреждение в консоль каждый кадр. Ставим
+// PCFShadowMap сразу — картинка та же, консоль чистая.
+const SOFT_SHADOWS = THREE.PCFShadowMap;
+
 export const QUALITY_PRESETS = {
   0: { pixelRatio: 0.5, shadows: false, shadowType: THREE.BasicShadowMap, shadowMapSize: 512, antialias: false, maxLights: 2, toneMapping: THREE.NoToneMapping },
   1: { pixelRatio: 0.7, shadows: false, shadowType: THREE.BasicShadowMap, shadowMapSize: 512, antialias: false, maxLights: 3, toneMapping: THREE.NoToneMapping },
   2: { pixelRatio: 1.0, shadows: true, shadowType: THREE.PCFShadowMap, shadowMapSize: 1024, antialias: false, maxLights: 4, toneMapping: THREE.ACESFilmicToneMapping },
-  3: { pixelRatio: 1.5, shadows: true, shadowType: THREE.PCFSoftShadowMap, shadowMapSize: 2048, antialias: true, maxLights: 8, toneMapping: THREE.ACESFilmicToneMapping },
-  4: { pixelRatio: 2.0, shadows: true, shadowType: THREE.PCFSoftShadowMap, shadowMapSize: 4096, antialias: true, maxLights: 16, toneMapping: THREE.ACESFilmicToneMapping },
+  3: { pixelRatio: 1.5, shadows: true, shadowType: SOFT_SHADOWS, shadowMapSize: 2048, antialias: true, maxLights: 8, toneMapping: THREE.ACESFilmicToneMapping },
+  4: { pixelRatio: 2.0, shadows: true, shadowType: SOFT_SHADOWS, shadowMapSize: 4096, antialias: true, maxLights: 16, toneMapping: THREE.ACESFilmicToneMapping },
 };
 
 export class Renderer {

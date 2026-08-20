@@ -2,7 +2,6 @@
 // WFL Engine — прогон всех тестов.
 import { spawn } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,9 +9,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 
 // Часть тестов использует собранный рантайм — на чистом клоне его ещё нет
-if (!existsSync(resolve(root, 'src/apk/runtime-bundle.js'))) {
-  await import('../build-runtime.mjs');
-}
+const { buildRuntime } = await import('../build-runtime.mjs');
+await buildRuntime({ quiet: true });
 
 const files = (await readdir(here))
   .filter((f) => f.startsWith('t_') && f.endsWith('.mjs'))

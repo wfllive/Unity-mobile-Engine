@@ -84,7 +84,13 @@ function platformerScene(name) {
   const cam = scene.find('Камера');
   if (cam) {
     cam.transform.position = new THREE.Vector3(0, 6, 12);
-    cam.addComponent('FollowCamera', { target: null, distance: 8, height: 3.5 });
+    // Цель задаётся именем: прямая ссылка на объект не переживает
+    // сериализацию, и после загрузки камера переставала следовать за игроком.
+    cam.addComponent('FollowCamera', {
+      targetName: 'Игрок',
+      offset: new THREE.Vector3(0, 3.5, 8),
+      smoothTime: 0.18,
+    });
   }
   return scene;
 }

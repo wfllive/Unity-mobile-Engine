@@ -5,11 +5,11 @@
   "type": "module",
   "description": "WFL Engine - Unity-подобный игровой движок на three.js для браузера и мобильных, со своей сборкой APK без Gradle",
   "scripts": {
-    "dev": "node tools/build-runtime.mjs && vite --host 0.0.0.0 --port 3000",
-    "build": "node tools/build-runtime.mjs && vite build",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "apk": "node tools/cli.mjs apk",
-    "build:runtime": "node tools/build-runtime.mjs",
+    "build:runtime": "node tools/build-runtime.mjs --force",
     "test": "node tools/test/run-all.mjs"
   },
   "dependencies": {
