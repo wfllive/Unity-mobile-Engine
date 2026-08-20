@@ -42,6 +42,64 @@ export function getNodeDef(type) {
   return NodeRegistry.get(type);
 }
 
+/* =======================================================================
+   СОВМЕСТИМОСТЬ ТИПОВ ПИНОВ
+   =======================================================================
+   Матрица «из чего → во что» можно соединять. Значение:
+     'ok'   — типы совпадают, соединяем молча;
+     'cast' — допустимо с неявным приведением (предупреждаем, но разрешаем);
+     null   — соединять нельзя.
+   'any' совместим со всем в обе стороны — это осознанно «дикий» тип. */
+const TYPE_CAST = {
+  number:  { number: 'ok', boolean: 'cast', string: 'cast', any: 'ok' },
+  string:  { string: 'ok', any: 'ok', number: 'cast', boolean: 'cast' },
+  boolean: { boolean: 'ok', number: 'cast', string: 'cast', any: 'ok' },
+  vector:  { vector: 'ok', any: 'ok' },
+  object:  { object: 'ok', any: 'ok' },
+  any:     { number: 'ok', string: 'ok', boolean: 'ok', vector: 'ok', object: 'ok', any: 'ok' },
+};
+
+export const PIN_TYPE_LABELS = {
+  number: 'число', string: 'строка', boolean: 'да/нет',
+  vector: 'вектор', object: 'объект', any: 'любой', exec: 'поток',
+};
+
+/**
+ * Можно ли соединить выход типа `from` со входом типа `to`.
+ * @returns {{ok: boolean, cast: boolean, reason: string}}
+ */
+export function canConnectTypes(from, to) {
+  const a = from ?? 'any';
+  const b = to ?? 'any';
+  if (a === 'exec' || b === 'exec') {
+    return a === b
+      ? { ok: true, cast: false, reason: '' }
+      : { ok: false, cast: false, reason: 'Поток выполнения нельзя соединить со значением' };
+  }
+  const verdict = TYPE_CAST[a]?.[b] ?? null;
+  if (verdict === 'ok') return { ok: true, cast: false, reason: '' };
+  if (verdict === 'cast') {
+    return {
+      ok: true,
+      cast: true,
+      reason: `${PIN_TYPE_LABELS[a] ?? a} → ${PIN_TYPE_LABELS[b] ?? b}: значение будет приведено`,
+    };
+  }
+  return {
+    ok: false,
+    cast: false,
+    reason: `Несовместимые типы: ${PIN_TYPE_LABELS[a] ?? a} → ${PIN_TYPE_LABELS[b] ?? b}`,
+  };
+}
+
+/** Тип конкретного пина узла. kind: 'in' | 'out' */
+export function pinType(nodeType, kind, pinName) {
+  const def = getNodeDef(nodeType);
+  if (!def) return null;
+  const list = kind === 'out' ? def.outputs : def.inputs;
+  return list?.find((p) => p.name === pinName)?.type ?? null;
+}
+
 /** Цвета категорий — используются и в редакторе, и в легенде */
 export const CATEGORY_COLORS = {
   'События': '#b3402f',

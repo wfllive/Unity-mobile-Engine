@@ -10,7 +10,7 @@
 //     { from: idУзла, exec: 'out', to: idУзла, execIn: 'in' }                 // поток
 //   ]
 // }
-import { getNodeDef } from './nodes.js';
+import { getNodeDef, canConnectTypes, pinType } from './nodes.js';
 
 const MAX_STEPS = 10000;   // защита от бесконечных циклов на кадр
 
@@ -94,10 +94,28 @@ export class BlueprintGraph {
     this._rebuild();
   }
 
+  /**
+   * Проверить, допустимо ли соединение, не создавая его.
+   * @returns {{ok: boolean, cast: boolean, reason: string}}
+   */
+  checkConnection(fromId, fromPin, toId, toPin, isExec = false) {
+    if (fromId === toId) return { ok: false, cast: false, reason: 'Узел нельзя соединить сам с собой' };
+    if (!this.nodes.has(fromId) || !this.nodes.has(toId)) {
+      return { ok: false, cast: false, reason: 'Один из узлов не найден' };
+    }
+    if (isExec) return { ok: true, cast: false, reason: '' };
+    const a = this.nodes.get(fromId);
+    const b = this.nodes.get(toId);
+    return canConnectTypes(pinType(a.type, 'out', fromPin), pinType(b.type, 'in', toPin));
+  }
+
   /** Соединить пины. Для exec: connect(a,'out',b,'in',true) */
   connect(fromId, fromPin, toId, toPin, isExec = false) {
     if (fromId === toId) return null;
     if (!this.nodes.has(fromId) || !this.nodes.has(toId)) return null;
+    // Типы данных проверяем и здесь, а не только в редакторе: граф может
+    // собираться кодом или прийти из чужого JSON.
+    if (!isExec && !this.checkConnection(fromId, fromPin, toId, toPin, false).ok) return null;
     let link;
     if (isExec) {
       // Один exec-выход ведёт максимум в одно место

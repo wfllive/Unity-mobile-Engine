@@ -2,7 +2,9 @@
 // Полноэкранный оверлей: холст с узлами, кривые связей на SVG, палитра узлов,
 // панорамирование/зум колесом и щипком, работа мышью и пальцем.
 import { BlueprintGraph } from '../engine/blueprint/graph.js';
-import { getNodeDef, nodesByCategory, CATEGORY_COLORS } from '../engine/blueprint/nodes.js';
+import {
+  getNodeDef, nodesByCategory, CATEGORY_COLORS, canConnectTypes, pinType, PIN_TYPE_LABELS,
+} from '../engine/blueprint/nodes.js';
 
 const STYLE_ID = 'wfl-bp-styles';
 
@@ -38,7 +40,7 @@ const BP_CSS = `
 .wfl-bp-row.out{justify-content:flex-end;text-align:right}
 .wfl-bp-plabel{font-size:11.5px;color:#9aa7ba;white-space:nowrap}
 .wfl-bp-pin{width:11px;height:11px;border-radius:50%;border:2px solid #0d1017;flex:0 0 auto;cursor:crosshair;
-  box-sizing:content-box;transition:transform .1s}
+  box-sizing:content-box;transition:transform .1s,box-shadow .1s,opacity .1s;position:relative}
 .wfl-bp-pin:hover,.wfl-bp-pin.hot{transform:scale(1.45)}
 .wfl-bp-pin.exec{border-radius:2px;width:10px;height:12px;
   clip-path:polygon(0 0,62% 0,100% 50%,62% 100%,0 100%);background:#e6ecf5!important;border:none}
@@ -73,12 +75,84 @@ const BP_CSS = `
 .wfl-bp-zoom button{width:26px;height:24px;padding:0}
 .wfl-bp-err{position:absolute;right:10px;bottom:10px;max-width:320px;background:rgba(74,28,34,.95);
   border:1px solid #7a2c34;color:#ffb0b6;border-radius:8px;padding:7px 10px;font-size:11.5px;line-height:1.5}
+/* Кнопки панели (раньше класс не имел стилей и выглядел как системная кнопка) */
+.wfl-btn2{background:#1b2231;border:1px solid #2b3548;color:#c9d3e2;border-radius:6px;
+  padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;
+  transition:background .12s,border-color .12s}
+.wfl-btn2:hover{background:#232c3e;color:#fff}
+.wfl-btn2:active{background:#2b3548}
+.wfl-btn2.play{background:#1d6b45;border-color:#2b9463;color:#d8ffe9}
+.wfl-btn2.play:hover{background:#248055}
+.wfl-btn2.danger{background:#5a2129;border-color:#7a2c34;color:#ffc9ce}
+.wfl-btn2.danger:hover{background:#6d2832}
+.wfl-ed-sep{width:1px;height:20px;background:#2b3548;flex:0 0 auto;margin:0 2px}
+
+/* Подсветка пинов при протягивании связи */
+.wfl-bp-pin.cand-ok{box-shadow:0 0 0 3px rgba(122,208,168,.55);transform:scale(1.5)}
+.wfl-bp-pin.cand-cast{box-shadow:0 0 0 3px rgba(224,180,90,.55);transform:scale(1.5)}
+.wfl-bp-pin.cand-bad{opacity:.25}
+.wfl-bp-node.dim{opacity:.45}
+
+/* Всплывающая подсказка о типе пина */
+.wfl-bp-tip{position:absolute;z-index:20;background:#0d1119;border:1px solid #2b3548;
+  color:#c9d3e2;border-radius:6px;padding:4px 8px;font-size:11.5px;pointer-events:none;
+  white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.wfl-bp-tip.bad{border-color:#7a2c34;color:#ffb0b6}
+.wfl-bp-tip.cast{border-color:#8a6d2f;color:#ffd89a}
+
+/* Нижняя панель для телефона */
+.wfl-bp-mobile{display:none}
+.wfl-bp-fab{position:absolute;right:12px;bottom:74px;width:52px;height:52px;border-radius:50%;
+  background:#3d6ecf;border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:6}
+.wfl-bp-fab:active{background:#3560b8}
+.wfl-bp-linkmode{position:absolute;left:50%;transform:translateX(-50%);top:10px;z-index:8;
+  background:rgba(61,110,207,.95);color:#fff;border-radius:20px;padding:7px 14px;font-size:12px;
+  box-shadow:0 4px 14px rgba(0,0,0,.45);display:flex;align-items:center;gap:10px}
+.wfl-bp-linkmode button{background:rgba(0,0,0,.28);border:none;color:#fff;border-radius:12px;
+  padding:4px 10px;font:inherit;font-size:11.5px;cursor:pointer}
+
 @media (max-width:900px){
-  .wfl-bp-side{position:absolute;right:0;top:0;bottom:0;width:210px;z-index:5;
+  .wfl-bp-side{position:absolute;right:0;top:0;bottom:0;width:min(84vw,300px);z-index:9;
     box-shadow:-8px 0 24px rgba(0,0,0,.5);transform:translateX(100%);transition:transform .18s}
   .wfl-bp-side.open{transform:translateX(0)}
   .wfl-bp-name{width:110px}
-  .wfl-bp-node{min-width:132px}
+  .wfl-bp-node{min-width:150px}
+  /* Крупные цели нажатия: пины и кнопки по рекомендациям ~44px */
+  .wfl-bp-pin{width:15px;height:15px;border-width:3px}
+  .wfl-bp-pin.exec{width:14px;height:17px}
+  /* Невидимая зона нажатия вокруг пина. Высота меньше шага строки (32px),
+     иначе соседние пины перехватывали бы тап друг у друга. */
+  .wfl-bp-pin::after{content:'';position:absolute;left:50%;top:50%;
+    width:36px;height:28px;transform:translate(-50%,-50%)}
+  .wfl-bp-row{min-height:32px;padding:3px 10px}
+  .wfl-bp-node-hd{padding:10px 12px;font-size:13px}
+  .wfl-bp-inp{padding:6px 7px;font-size:13px;width:74px}
+  .wfl-bp-vec input{width:46px}
+  .wfl-bp-item{padding:11px 12px 11px 16px;font-size:13.5px}
+  .wfl-bp-search{padding:10px;font-size:14px}
+  .wfl-bp-cat{padding:8px 12px 4px}
+  .wfl-btn2{padding:9px 12px;font-size:13px}
+  .wfl-bp-top{height:52px;gap:7px}
+  .wfl-bp-zoom{bottom:auto;top:10px;left:10px;padding:6px 8px}
+  .wfl-bp-zoom button{width:34px;height:32px}
+  .wfl-bp-err{bottom:74px;left:10px;right:10px;max-width:none}
+  /* Нижняя панель с самыми частыми действиями */
+  .wfl-bp-mobile{display:flex;position:absolute;left:0;right:0;bottom:0;height:60px;z-index:7;
+    background:#12161f;border-top:1px solid #232b3a;align-items:center;
+    justify-content:space-around;padding:0 6px;gap:4px}
+  .wfl-bp-mobile button{flex:1;height:46px;background:#1b2231;border:1px solid #2b3548;
+    color:#c9d3e2;border-radius:8px;font:inherit;font-size:12px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .wfl-bp-mobile button:active{background:#2b3548}
+  .wfl-bp-mobile button.on{background:#3d6ecf;border-color:#3d6ecf;color:#fff}
+  .wfl-bp-mobile button.play{background:#1d6b45;border-color:#2b9463;color:#d8ffe9}
+  .wfl-bp-canvas{padding-bottom:60px}
+}
+@media (max-width:900px) and (orientation:landscape){
+  .wfl-bp-mobile{height:48px}
+  .wfl-bp-mobile button{height:38px}
+  .wfl-bp-top{height:44px}
 }
 `;
 
@@ -130,6 +204,12 @@ export class BlueprintEditor {
     this._pending = null;   // тянущаяся связь
     this._pointers = new Map();
     this._pinchDist = 0;
+    this._tapFrom = null;   // первый пин в режиме «нажми-нажми»
+    this._pinDownAt = null;
+    // На сенсорных экранах режим соединения тапами включён сразу
+    this.isTouch = typeof window !== 'undefined'
+      && (('ontouchstart' in window) || (navigator.maxTouchPoints ?? 0) > 0);
+    this.tapMode = this.isTouch;
 
     this._build();
     this.render();
@@ -159,6 +239,14 @@ export class BlueprintEditor {
     this._btn(top, 'Дублировать', () => this.duplicateSelection());
     this._btn(top, 'Удалить', () => this.deleteSelection(), 'danger');
     top.appendChild(el('div', 'wfl-ed-sep'));
+    this.tapBtnTop = this._btn(top, 'Связь тапом', () => {
+      this.tapMode = !this.tapMode;
+      this._clearTap();
+      this._syncTapBtn();
+      this._flash(this.tapMode
+        ? 'Режим связи: нажмите пин, затем второй пин'
+        : 'Режим связи выключен — связи тянутся мышью', 'info');
+    });
     this._btn(top, 'Проверить', () => this.validate());
     this._btn(top, 'Шаблон', () => this.insertTemplate());
     top.appendChild(el('div', 'wfl-ed-sep'));
@@ -209,9 +297,37 @@ export class BlueprintEditor {
     this.list = el('div', 'wfl-bp-list');
     this.side.appendChild(this.list);
     this.side.appendChild(el('div', 'wfl-bp-hint',
-      'Тяните от пина к пину, чтобы соединить. Клик по связи — удалить. '
-      + 'Колесо/щипок — зум, перетаскивание фона — панорама.'));
+      'Соединить: нажмите один пин, затем второй (или тяните от пина к пину). '
+      + 'Зелёный ободок — можно, жёлтый — с приведением типа. '
+      + 'Клик по связи — удалить. Щипок — зум, перетаскивание фона — панорама.'));
     body.appendChild(this.side);
+
+    // --- Нижняя панель для телефона ---
+    this.mobileBar = el('div', 'wfl-bp-mobile');
+    const mbtn = (label, sub, cb, cls = '') => {
+      const b = el('button', cls);
+      b.appendChild(el('span', null, label));
+      if (sub) b.appendChild(el('span', null, sub)).style.cssText = 'font-size:10px;opacity:.65';
+      b.addEventListener('click', (e) => { e.stopPropagation(); cb(b); });
+      this.mobileBar.appendChild(b);
+      return b;
+    };
+    mbtn('＋', 'узел', () => this.toggleSide(true));
+    this.tapBtn = mbtn('🔗', 'связь', () => {
+      this.tapMode = !this.tapMode;
+      this._clearTap();
+      this._syncTapBtn();
+      this._flash(this.tapMode
+        ? 'Режим связи: нажмите пин, затем второй пин'
+        : 'Режим связи выключен — узлы можно двигать', 'info');
+    });
+    mbtn('⤢', 'вписать', () => this.fitView());
+    mbtn('⧉', 'копия', () => this.duplicateSelection());
+    mbtn('🗑', 'удалить', () => this.deleteSelection());
+    mbtn('✓', 'применить', () => this.apply(), 'play');
+    body.appendChild(this.mobileBar);
+    this._syncTapBtn();
+
     this.root.appendChild(body);
 
     this._fillPalette('');
@@ -226,6 +342,15 @@ export class BlueprintEditor {
     b.addEventListener('click', (e) => { e.stopPropagation(); cb(); });
     parent.appendChild(b);
     return b;
+  }
+
+  _syncTapBtn() {
+    this.tapBtn?.classList.toggle('on', this.tapMode);
+    this.canvas?.classList.toggle('tapmode', this.tapMode);
+    if (this.tapBtnTop) {
+      this.tapBtnTop.classList.toggle('play', this.tapMode);
+      this.tapBtnTop.textContent = this.tapMode ? 'Связь тапом: вкл' : 'Связь тапом';
+    }
   }
 
   toggleSide(force) {
@@ -294,6 +419,8 @@ export class BlueprintEditor {
       if (!seen.has(id)) { elm.remove(); this._nodeEls.delete(id); }
     }
     this._applyTransform();
+    // Пины перестроились — вернуть подсветку допустимых целей
+    if (this._tapFrom) this._highlightCandidates(this._tapFrom);
     this.drawLinks();
     this.emptyHint.style.display = this.graph.nodes.size ? 'none' : 'flex';
     const s = this.graph.stats;
@@ -409,7 +536,7 @@ export class BlueprintEditor {
     p.dataset.kind = kind;
     p.dataset.pin = name;
     p.dataset.type = type;
-    p.title = `${name} (${type})`;
+    p.title = `${name} — ${PIN_TYPE_LABELS[type] ?? type}`;
 
     const connected = this._isConnected(node.id, kind, name);
     if (connected) p.classList.add('connected', 'linked');
@@ -417,13 +544,139 @@ export class BlueprintEditor {
     p.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       e.preventDefault();
+      // Режим «нажми-нажми»: первый тап выбирает пин, второй — соединяет.
+      // На телефоне тянуть тонкую нить пальцем неудобно, поэтому он основной.
+      if (this.tapMode) { this._tapPin(p); return; }
       this._startLink(p, e);
+      this._pinDownAt = { x: e.clientX, y: e.clientY, t: Date.now() };
     });
     p.addEventListener('pointerup', (e) => {
       e.stopPropagation();
+      if (this.tapMode) return;
+      // Короткий тап без смещения = пользователь «кликнул» пин, а не тянул.
+      // Тогда не рвём связь, а переходим в режим ожидания второго пина.
+      const d = this._pinDownAt;
+      const moved = d ? Math.hypot(e.clientX - d.x, e.clientY - d.y) : 99;
+      if (d && moved < 6 && Date.now() - d.t < 400 && this._pending?.nodeId === p.dataset.node
+          && this._pending?.name === p.dataset.pin) {
+        this._pinDownAt = null;
+        this._tapPin(p, true);
+        return;
+      }
+      this._pinDownAt = null;
       this._finishLink(p);
     });
     return p;
+  }
+
+  /** Соединение в два нажатия (основной способ на телефоне) */
+  _tapPin(pinEl, fromDrag = false) {
+    const info = {
+      nodeId: pinEl.dataset.node,
+      name: pinEl.dataset.pin,
+      kind: pinEl.dataset.kind,
+      isExec: pinEl.dataset.type === 'exec',
+      type: pinEl.dataset.type,
+    };
+    // Повторный тап по тому же пину — отмена
+    if (this._tapFrom && this._tapFrom.nodeId === info.nodeId
+        && this._tapFrom.name === info.name && this._tapFrom.kind === info.kind) {
+      this._clearTap();
+      return;
+    }
+    if (!this._tapFrom) {
+      this._pending = null;
+      this._tapFrom = info;
+      if (!fromDrag) this._flash(`Выбран пин «${info.name}». Теперь нажмите второй пин.`, 'info');
+      else this._flash(`Выбран пин «${info.name}». Нажмите второй пин, чтобы соединить.`, 'info');
+      this._highlightCandidates(info);
+      this.drawLinks();
+      return;
+    }
+    const a = this._tapFrom;
+    this._clearTap();
+    this._applyConnection(a, info);
+  }
+
+  _clearTap() {
+    this._tapFrom = null;
+    this._pending = null;
+    this._clearCandidates();
+    this.drawLinks();
+  }
+
+  /**
+   * Общая для мыши и тапа проверка + создание связи.
+   * @param {object} a — пин-источник, {object} b — пин-приёмник
+   */
+  _applyConnection(a, b) {
+    if (a.isExec !== b.isExec) {
+      this._flash('Поток выполнения нельзя соединить со значением', 'bad');
+      this.drawLinks();
+      return false;
+    }
+    const outKinds = ['out', 'execOut'];
+    let from; let fromPin; let to; let toPin;
+    if (outKinds.includes(a.kind) && !outKinds.includes(b.kind)) {
+      from = a.nodeId; fromPin = a.name; to = b.nodeId; toPin = b.name;
+    } else if (!outKinds.includes(a.kind) && outKinds.includes(b.kind)) {
+      from = b.nodeId; fromPin = b.name; to = a.nodeId; toPin = a.name;
+    } else {
+      this._flash('Соединять можно только выход со входом', 'bad');
+      this.drawLinks();
+      return false;
+    }
+    if (from === to) {
+      this._flash('Узел нельзя соединить сам с собой', 'bad');
+      this.drawLinks();
+      return false;
+    }
+    const verdict = this.graph.checkConnection(from, fromPin, to, toPin, a.isExec);
+    if (!verdict.ok) {
+      this._flash(verdict.reason, 'bad');
+      this.drawLinks();
+      return false;
+    }
+    this.graph.connect(from, fromPin, to, toPin, a.isExec);
+    this.render();
+    if (verdict.cast) this._flash(verdict.reason, 'cast');
+    return true;
+  }
+
+  /** Подсветить пины, куда можно тянуть от выбранного */
+  _highlightCandidates(src) {
+    this._clearCandidates();
+    const outKinds = ['out', 'execOut'];
+    const srcIsOut = outKinds.includes(src.kind);
+    for (const [nodeId, nodeEl] of this._nodeEls) {
+      let anyOk = false;
+      for (const pin of nodeEl.querySelectorAll('.wfl-bp-pin')) {
+        const isExec = pin.dataset.type === 'exec';
+        const isOut = outKinds.includes(pin.dataset.kind);
+        let cls = 'cand-bad';
+        if (nodeId !== src.nodeId && isExec === src.isExec && isOut !== srcIsOut) {
+          if (isExec) cls = 'cand-ok';
+          else {
+            const outType = srcIsOut ? src.type : pin.dataset.type;
+            const inType = srcIsOut ? pin.dataset.type : src.type;
+            const v = canConnectTypes(outType, inType);
+            cls = v.ok ? (v.cast ? 'cand-cast' : 'cand-ok') : 'cand-bad';
+          }
+        }
+        if (cls !== 'cand-bad') anyOk = true;
+        pin.classList.add(cls);
+      }
+      nodeEl.classList.toggle('dim', !anyOk && nodeId !== src.nodeId);
+    }
+  }
+
+  _clearCandidates() {
+    for (const nodeEl of this._nodeEls.values()) {
+      nodeEl.classList.remove('dim');
+      for (const pin of nodeEl.querySelectorAll('.wfl-bp-pin')) {
+        pin.classList.remove('cand-ok', 'cand-cast', 'cand-bad');
+      }
+    }
   }
 
   _isConnected(nodeId, kind, name) {
@@ -575,44 +828,42 @@ export class BlueprintEditor {
 
     this._pending = {
       nodeId, name, kind, isExec,
+      type: pinEl.dataset.type,
       a: this._pinPos(nodeId, kind, name),
       cursor: this._toWorld(e.clientX, e.clientY),
     };
     this.canvas.setPointerCapture?.(e.pointerId);
     this._pendingPointer = e.pointerId;
+    this._highlightCandidates(this._pending);
     this.drawLinks();
   }
 
   _finishLink(pinEl) {
     const p = this._pending;
     if (!p) return;
-    const kind = pinEl.dataset.kind;
-    const nodeId = pinEl.dataset.node;
-    const name = pinEl.dataset.pin;
-    const isExec = pinEl.dataset.type === 'exec';
     this._pending = null;
-
-    if (isExec !== p.isExec) { this._flash('Нельзя соединить поток выполнения со значением'); this.drawLinks(); return; }
-
-    // Определяем направление: выход → вход
-    let from, fromPin, to, toPin;
-    const outKinds = ['out', 'execOut'];
-    if (outKinds.includes(p.kind) && !outKinds.includes(kind)) {
-      from = p.nodeId; fromPin = p.name; to = nodeId; toPin = name;
-    } else if (!outKinds.includes(p.kind) && outKinds.includes(kind)) {
-      from = nodeId; fromPin = name; to = p.nodeId; toPin = p.name;
-    } else {
-      this._flash('Соединять можно только выход со входом');
-      this.drawLinks();
-      return;
-    }
-    if (from === to) { this._flash('Узел нельзя соединить сам с собой'); this.drawLinks(); return; }
-
-    this.graph.connect(from, fromPin, to, toPin, isExec);
-    this.render();
+    this._clearCandidates();
+    this._applyConnection(p, {
+      nodeId: pinEl.dataset.node,
+      name: pinEl.dataset.pin,
+      kind: pinEl.dataset.kind,
+      isExec: pinEl.dataset.type === 'exec',
+      type: pinEl.dataset.type,
+    });
   }
 
-  _flash(msg) {
+  /** @param {'bad'|'cast'|'info'|'ok'} tone */
+  _flash(msg, tone = 'bad') {
+    const palette = {
+      bad:  ['rgba(74,28,34,.95)', '#7a2c34', '#ffb0b6'],
+      cast: ['rgba(66,52,20,.95)', '#8a6d2f', '#ffd89a'],
+      info: ['rgba(24,44,74,.95)', '#2c4f8a', '#bcd6ff'],
+      ok:   ['rgba(29,107,69,.95)', '#2b9463', '#c8ffe2'],
+    };
+    const [bg, border, color] = palette[tone] ?? palette.bad;
+    this.errBox.style.background = bg;
+    this.errBox.style.borderColor = border;
+    this.errBox.style.color = color;
     this.errBox.textContent = msg;
     this.errBox.style.display = 'block';
     clearTimeout(this._flashTimer);
@@ -646,6 +897,8 @@ export class BlueprintEditor {
   _bindCanvas() {
     this.canvas.addEventListener('pointerdown', (e) => {
       if (e.target !== this.canvas && e.target !== this.world && e.target.tagName !== 'svg') return;
+      // Тап по пустому месту отменяет начатое соединение
+      if (this._tapFrom) { this._clearTap(); this._flash('Соединение отменено', 'info'); }
       this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this._pointers.size === 1) {
         this._pan = { x: e.clientX, y: e.clientY, px: this.panX, py: this.panY };
@@ -705,15 +958,19 @@ export class BlueprintEditor {
       if (this._pointers.size < 2) this._pinchDist = 0;
       if (this._pointers.size === 0) { this._pan = null; this.canvas.classList.remove('panning'); }
       if (this._drag) { this._drag = null; this.drawLinks(); }
-      if (this._pending) { this._pending = null; this.drawLinks(); }
+      // В режиме тапа выбранный пин живёт до второго нажатия
+      if (this._pending && !this._tapFrom) {
+        this._pending = null; this._clearCandidates(); this.drawLinks();
+      }
     };
     this.canvas.addEventListener('pointerup', endPointer);
     this.canvas.addEventListener('pointercancel', endPointer);
     // Отпускание кнопки над узлом тоже завершает перетаскивание
     window.addEventListener('pointerup', (e) => {
       if (this._drag) { this._drag = null; this.drawLinks(); }
+      if (this._tapFrom) return;
       if (this._pending && e.target?.classList?.contains('wfl-bp-pin')) return;
-      if (this._pending) { this._pending = null; this.drawLinks(); }
+      if (this._pending) { this._pending = null; this._clearCandidates(); this.drawLinks(); }
     });
 
     this.canvas.addEventListener('wheel', (e) => {
