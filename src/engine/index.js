@@ -19,7 +19,7 @@ export {
 
 // Ввод
 export { InputSystem, Touch, detectMobile } from './input/input.js';
-export { TouchControls, VirtualJoystick, TouchButton, TouchLookArea } from './input/touch-controls.js';
+export { TouchControls, VirtualJoystick, TouchButton, TouchLookArea, TOUCH_ICON } from './input/touch-controls.js';
 
 // Физика
 export {

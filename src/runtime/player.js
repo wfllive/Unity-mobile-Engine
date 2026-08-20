@@ -1,72 +1,72 @@
 // WFL Engine — рантайм-плеер, который запускается внутри APK (или standalone HTML).
-// Загружает сцену, сериализованную редактором, и запускает её без редактора.
-import { Engine, Scene, GlobalEvents } from '../engine/index.js';
-import { buildDemoScene } from '../game/demo-scene.js';
+// Загружает сцену, собранную в редакторе, и сразу запускает её: никакого
+// редактора, никаких меню проектов — только игра и её интерфейс.
+import { Engine, Scene, GlobalEvents, THREE } from '../engine/index.js';
+import { PlayOverlay } from '../shell/play-overlay.js';
 
 /**
  * Запустить игру из сериализованной сцены.
  * @param {object} [opts]
- * @param {object|null} [opts.scene] данные сцены (`Scene.serialize()`); null → демо
+ * @param {object|null} [opts.scene] данные сцены (`Scene.serialize()`)
  * @param {HTMLElement} [opts.container]
  * @param {object} [opts.config] конфигурация сборки (имя игры и т.п.)
  */
 export function startPlayer({ scene = null, container = document.body, config = {} } = {}) {
   const engine = new Engine({
     container,
-    touchControls: 'auto',
+    touchControls: true,
     adaptiveQuality: true,
     pauseOnBlur: true,
     fixedTimeStep: 1 / 60,
   });
 
-  let loaded = null;
-  if (scene && scene.objects?.length) {
-    try {
-      loaded = Scene.deserialize(scene, engine);
-    } catch (err) {
-      console.error('Не удалось загрузить сцену, запускаем демо:', err);
-      loaded = null;
-    }
-  }
-
-  if (!loaded) {
-    loaded = buildDemoScene(engine).scene;
-  }
-
-  engine.loadScene(loaded);
-
-  // Если в сцене не оказалось камеры — добавим свободную
-  if (!engine.scene.mainCamera) {
-    const cam = engine.scene.createGameObject('Камера', { position: [0, 6, 12] });
-    cam.addComponent('Camera', { fov: 60 });
-    cam.transform.lookAt?.(0, 0, 0);
-  }
-
+  const snapshot = scene && scene.objects?.length ? scene : null;
+  loadInto(engine, snapshot);
   engine.start();
 
-  // Простейший HUD: FPS по долгому тапу тремя пальцами (для отладки на устройстве)
-  installDebugGesture(engine);
-
-  window.wfl = { engine, get scene() { return engine.scene; }, config };
+  const overlay = new PlayOverlay({
+    engine,
+    title: config.appName ?? 'WFL Game',
+    standalone: true,
+    onExit: () => {
+      // В собранном приложении выходить некуда — просто снимаем паузу
+      overlay.resume();
+    },
+    onRestart: () => {
+      loadInto(engine, snapshot);
+      engine.touchControls?.show();
+      overlay.rebindScene();
+      overlay.onRestarted();
+      engine.resume();
+    },
+  });
+  window.wfl = { engine, overlay, get scene() { return engine.scene; }, config };
   GlobalEvents.emit('player:started', engine);
   return engine;
 }
 
-function installDebugGesture(engine) {
-  let shown = false;
-  window.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 3) {
-      shown = !shown;
-      engine.ui?.showStats?.(shown);
-    }
-  }, { passive: true });
+/** Загрузить сцену (или запасную пустую) в движок */
+function loadInto(engine, data) {
+  engine.scene?.unload();
+  engine.physics?.clear?.();
+  let scene = null;
+  if (data) {
+    try { scene = Scene.deserialize(data, engine); }
+    catch (err) { console.error('Не удалось прочитать сцену:', err); }
+  }
+  if (!scene) {
+    scene = new Scene('Сцена');
+    scene.engine = engine;
+  }
+  scene.physics = engine.physics;
+  engine.loadScene(scene);
 
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'F3') {
-      shown = !shown;
-      engine.ui?.showStats?.(shown);
-    }
-  });
+  if (!engine.scene.mainCamera) {
+    const cam = engine.scene.createGameObject('Камера', { position: [0, 6, 12] });
+    cam.addComponent('Camera', { fieldOfView: 60, isMainCamera: true });
+    cam.transform.lookAt(new THREE.Vector3(0, 0, 0));
+  }
+  return scene;
 }
 
 // Автозапуск: данные подставляются сборщиком APK в window.__WFL_SCENE__

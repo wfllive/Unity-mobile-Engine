@@ -316,7 +316,12 @@ export class BlueprintEditor {
     const color = CATEGORY_COLORS[def.category] ?? '#495057';
     const hd = el('div', 'wfl-bp-node-hd', def.title);
     hd.style.background = color;
-    if (def.event) hd.textContent = `⚡ ${def.title}`;
+    if (def.event) {
+      // Событийные узлы помечаем значком-молнией, а не эмодзи
+      hd.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"'
+        + ' style="vertical-align:-2px;margin-right:5px"><path d="M13.2 2.8L4.6 13.4h6L10 21.2l8.6-10.6h-6z"/></svg>'
+        + `<span>${def.title.replace(/[&<>]/g, '')}</span>`;
+    }
     wrap.appendChild(hd);
     this._makeDraggable(wrap, node, hd);
 

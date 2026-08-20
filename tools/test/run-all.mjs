@@ -31,7 +31,7 @@ console.log(`\n\x1b[1mWFL Engine — тесты (${files.length})\x1b[0m`);
 for (const f of files) {
   const { code, out } = await run(f);
   const okMark = code === 0 ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m';
-  const counts = out.match(/Итого: (\d+) ok, (\d+) ошиб/);
+  const counts = out.match(/Итого: (\d+) (?:ok|успешно), (\d+) ошиб/);
   const summary = counts ? `${counts[1]} проверок` : '';
   console.log(`  ${okMark} ${f.padEnd(16)} ${summary}`);
   if (code !== 0) { failed++; console.log(out.split('\n').map((l) => '      ' + l).join('\n')); }

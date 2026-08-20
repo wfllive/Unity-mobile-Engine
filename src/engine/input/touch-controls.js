@@ -112,6 +112,21 @@ export class VirtualJoystick {
   }
 }
 
+/**
+ * Значки экранных кнопок. Рисуем SVG, а не символы юникода:
+ * шрифтовые глифы по-разному выглядят на разных устройствах.
+ */
+const svg = (body) => '<svg viewBox="0 0 24 24" width="45%" height="45%" fill="none"'
+  + ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  + body + '</svg>';
+
+export const TOUCH_ICON = {
+  jump: svg('<path d="M12 20V5"/><path d="M6 11l6-6 6 6"/>'),
+  fire: svg('<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/>'),
+  sprint: svg('<path d="M5 7l6 5-6 5"/><path d="M13 7l6 5-6 5"/>'),
+  crouch: svg('<path d="M12 4v15"/><path d="M6 13l6 6 6-6"/>'),
+};
+
 /** Экранная кнопка */
 export class TouchButton {
   constructor(input, opts = {}) {
@@ -125,7 +140,9 @@ export class TouchButton {
 
     const el = document.createElement('div');
     el.className = 'wfl-touch-button';
-    el.textContent = this.label;
+    // Иконка предпочтительнее подписи: она читается на любом языке
+    if (opts.icon) el.innerHTML = opts.icon;
+    else el.textContent = this.label;
     Object.assign(el.style, {
       position: 'absolute', width: this.size + 'px', height: this.size + 'px',
       touchAction: 'none', pointerEvents: 'auto', userSelect: 'none',
@@ -248,6 +265,7 @@ export class TouchControls {
   background:radial-gradient(circle at 40% 35%, rgba(255,255,255,.20), rgba(90,120,220,.18));
   border:2px solid rgba(255,255,255,.28);backdrop-filter:blur(6px);
   box-shadow:0 4px 18px rgba(0,0,0,.35);transition:transform .08s ease, background .08s ease;}
+.wfl-touch-button svg{display:block;opacity:.95}
 .wfl-touch-button.active{transform:scale(.9);background:radial-gradient(circle at 40% 35%, rgba(120,200,255,.55), rgba(60,110,240,.4));}
 .wfl-touch-controls *{-webkit-tap-highlight-color:transparent;}
 `;
@@ -285,15 +303,15 @@ export class TouchControls {
     this.addLookArea({ side: 'right', sensitivity: opts.lookSensitivity ?? 0.3 });
     this.addJoystick({ side: 'left', dynamic: opts.dynamicJoystick ?? false, radius: opts.joystickRadius ?? 62 });
     this.addButton({
-      button: 'Jump', label: '▲',
+      button: 'Jump', label: 'Прыжок', icon: TOUCH_ICON.jump,
       style: { right: '28px', bottom: '40px', width: '72px', height: '72px' },
     });
     this.addButton({
-      button: 'Fire1', label: '●',
+      button: 'Fire1', label: 'Действие', icon: TOUCH_ICON.fire,
       style: { right: '112px', bottom: '104px', width: '60px', height: '60px' },
     });
     this.addButton({
-      button: 'Sprint', label: '»',
+      button: 'Sprint', label: 'Бег', icon: TOUCH_ICON.sprint,
       style: { right: '112px', bottom: '32px', width: '54px', height: '54px' },
     });
     return this;

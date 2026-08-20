@@ -95,13 +95,15 @@ function saveConfig(cfg) {
  * @param {import('../engine/engine.js').Engine} engine
  * @param {object} [opts]
  * @param {object} [opts.sceneData] сцена для упаковки (по умолчанию — текущая)
+ * @param {object} [opts.project] проект: его имя и настройки подставляются в поля
  */
-export function openBuildDialog(engine, { sceneData = null } = {}) {
+export function openBuildDialog(engine, { sceneData = null, project = null } = {}) {
   if (dialogOpen) return null;
   dialogOpen = true;
   ensureStyles();
 
-  const cfg = loadConfig();
+  // Настройки проекта важнее глобальных: у каждой игры своё имя и пакет
+  const cfg = { ...loadConfig(), ...(project?.build ?? {}) };
 
   const backdrop = document.createElement('div');
   backdrop.className = 'wfl-build-backdrop';
