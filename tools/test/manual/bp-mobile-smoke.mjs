@@ -53,6 +53,12 @@ console.log('— Соединение двумя тапами (exec)');
   t(ed._tapFrom === null, 'после второго тапа выбор сброшен');
   t(g.links.some((l) => l.from === ev.id && l.to === pr.id && l.exec === 'out'),
     'exec-связь должна быть создана двумя тапами');
+  // Пользователь должен видеть подтверждение, а не гадать
+  t(ed.errBox.style.display === 'block', 'после соединения должно быть подтверждение');
+  t(/Соединено/.test(ed.errBox.textContent),
+    `подтверждение должно называть результат, получено "${ed.errBox.textContent}"`);
+  const outPin = pinOf(ev.id, 'execOut', 'out');
+  t(outPin.classList.contains('connected'), 'соединённый пин помечается как connected');
 }
 
 console.log('— Повторный тап по тому же пину отменяет');

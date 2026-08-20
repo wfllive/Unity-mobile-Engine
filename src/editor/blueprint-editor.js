@@ -8,6 +8,10 @@ import {
 
 const STYLE_ID = 'wfl-bp-styles';
 
+// Слой связей: сдвинут влево-вверх, чтобы покрывать и отрицательные координаты мира.
+const SVG_ORIGIN = 20000;
+const SVG_SIZE = SVG_ORIGIN * 2;
+
 const BP_CSS = `
 .wfl-bp{position:absolute;inset:0;z-index:70;display:flex;flex-direction:column;background:#0b0e14;
   font:13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#d7dee9;
@@ -27,6 +31,10 @@ const BP_CSS = `
 .wfl-bp-svg{position:absolute;left:-20000px;top:-20000px;width:40000px;height:40000px;overflow:visible;pointer-events:none}
 .wfl-bp-svg path{fill:none;stroke-linecap:round}
 .wfl-bp-svg path.hit{stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer}
+/* Вспышка только что созданной связи — сразу видно, что соединение появилось */
+.wfl-bp-svg path.justlinked{stroke-width:4;filter:drop-shadow(0 0 5px currentColor);
+  stroke-dasharray:9 7;animation:wfl-bp-run .9s linear}
+@keyframes wfl-bp-run{from{stroke-dashoffset:64}to{stroke-dashoffset:0}}
 
 .wfl-bp-node{position:absolute;min-width:150px;background:#171d29;
   border:1px solid #2b3548;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.45);overflow:hidden}
@@ -45,7 +53,11 @@ const BP_CSS = `
 .wfl-bp-pin.exec{border-radius:2px;width:10px;height:12px;
   clip-path:polygon(0 0,62% 0,100% 50%,62% 100%,0 100%);background:#e6ecf5!important;border:none}
 .wfl-bp-pin.exec.linked{background:#fff!important}
-.wfl-bp-pin.connected{box-shadow:0 0 0 2px rgba(255,255,255,.18)}
+/* Свободный пин — полый (видна тёмная сердцевина), соединённый — залитый.
+   Так состояние читается без разглядывания кривых. */
+.wfl-bp-pin:not(.exec){box-shadow:inset 0 0 0 3px #171d29}
+.wfl-bp-pin.connected:not(.exec){box-shadow:inset 0 0 0 0 #171d29,0 0 0 2px rgba(255,255,255,.22)}
+.wfl-bp-pin.connected.exec{box-shadow:0 0 0 2px rgba(255,255,255,.22)}
 .wfl-bp-inp{background:#0d1119;border:1px solid #263045;color:#dbe3ef;border-radius:4px;
   padding:2px 5px;font-size:11.5px;width:62px;font-family:inherit}
 .wfl-bp-inp.wide{width:104px}
@@ -265,6 +277,11 @@ export class BlueprintEditor {
     this.world = el('div', 'wfl-bp-world');
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.setAttribute('class', 'wfl-bp-svg');
+    // Холст сдвинут на -20000px, чтобы ловить связи с отрицательными координатами.
+    // Без viewBox внутренняя система координат SVG начиналась бы в его левом верхнем
+    // углу, и кривая с мировой точкой (500,500) рисовалась бы на -19500 — за экраном.
+    // viewBox совмещает систему координат SVG с мировой 1:1.
+    this.svg.setAttribute('viewBox', `${-SVG_ORIGIN} ${-SVG_ORIGIN} ${SVG_SIZE} ${SVG_SIZE}`);
     this.world.appendChild(this.svg);
     this.canvas.appendChild(this.world);
 
@@ -639,8 +656,26 @@ export class BlueprintEditor {
     }
     this.graph.connect(from, fromPin, to, toPin, a.isExec);
     this.render();
-    if (verdict.cast) this._flash(verdict.reason, 'cast');
+    // Явное подтверждение: иначе непонятно, соединилось или нет
+    if (verdict.cast) this._flash(`✓ Соединено. ${verdict.reason}`, 'cast');
+    else {
+      const fromTitle = getNodeDef(this.graph.nodes.get(from)?.type)?.title ?? '?';
+      const toTitle = getNodeDef(this.graph.nodes.get(to)?.type)?.title ?? '?';
+      this._flash(`✓ Соединено: ${fromTitle} → ${toTitle}`, 'ok');
+    }
+    this._pulseLink(from, fromPin, to, toPin, a.isExec);
     return true;
+  }
+
+  /** Кратко «прокатить» новую связь бегущим пунктиром — сразу видно, что появилось */
+  _pulseLink(from, fromPin, to, toPin, isExec) {
+    const link = this.graph.links.find((l) => l.from === from && l.to === to
+      && (isExec ? l.exec === fromPin && l.execIn === toPin : l.out === fromPin && l.in === toPin));
+    if (!link) return;
+    const path = this._linkPaths?.get(link);
+    if (!path) return;
+    path.classList.add('justlinked');
+    setTimeout(() => path.classList.remove('justlinked'), 900);
   }
 
   /** Подсветить пины, куда можно тянуть от выбранного */
@@ -752,6 +787,7 @@ export class BlueprintEditor {
   /* ==================== Связи ==================== */
   drawLinks() {
     this.svg.innerHTML = '';
+    this._linkPaths = new Map();
     for (const link of this.graph.links) {
       const isExec = link.exec !== undefined;
       const a = this._pinPos(link.from, isExec ? 'execOut' : 'out', isExec ? link.exec : link.out);
@@ -776,6 +812,7 @@ export class BlueprintEditor {
       path.setAttribute('stroke-width', isExec ? 2.6 : 2);
       if (!isExec) path.setAttribute('opacity', '0.9');
       this.svg.appendChild(path);
+      this._linkPaths.set(link, path);
     }
     // Тянущаяся связь
     if (this._pending?.a && this._pending.cursor) {
