@@ -61,5 +61,12 @@ export {
   ChaseAI, Projectile, Pickup, Spawner, KillZone, ScriptBehaviour,
 } from './components/gameplay.js';
 
+// Blueprints — визуальное программирование
+export { BlueprintGraph } from './blueprint/graph.js';
+export { Blueprint } from './blueprint/component.js';
+export {
+  NodeRegistry, defineNode, getNodeDef, nodesByCategory, CATEGORY_COLORS,
+} from './blueprint/nodes.js';
+
 export const VERSION = '0.1.0';
 export const ENGINE_NAME = 'WFL Engine';

@@ -145,6 +145,9 @@ export class Editor {
     this._btn(top, '⬇ Экспорт JSON', () => this.exportJSON());
     top.appendChild(el('div', 'wfl-ed-sep'));
 
+    this._btn(top, '🧩 Блюпринт', () => this.openBlueprint());
+    top.appendChild(el('div', 'wfl-ed-sep'));
+
     this._btn(top, '📦 Собрать APK', () => this.buildAPK());
     this._btn(top, '✕ Закрыть', () => this.close(), 'danger');
 
@@ -667,6 +670,22 @@ export class Editor {
           this._textareaField(wrap, label, cur ?? '', (v) => { comp[key] = v; comp.compile?.(); });
           break;
         }
+        case 'blueprint': {
+          const row = el('div', 'wfl-field');
+          row.appendChild(el('label', null, label));
+          const box = el('div');
+          box.style.cssText = 'display:flex;gap:5px;align-items:center';
+          const open = el('button', 'wfl-btn2', '🧩 Открыть граф');
+          open.style.flex = '1';
+          open.addEventListener('click', () => this.openBlueprint(comp));
+          box.appendChild(open);
+          row.appendChild(box);
+          wrap.appendChild(row);
+          const info = el('div', 'wfl-ed-empty', comp.summary ?? '');
+          info.style.cssText = 'padding:5px 0 0;text-align:left;font-size:11px';
+          wrap.appendChild(info);
+          break;
+        }
         default:
           if (typeof cur === 'number') this._field(wrap, label, 'number', cur, (v) => { comp[key] = v; this._afterEdit(comp); });
           else if (typeof cur === 'boolean') this._field(wrap, label, 'checkbox', cur, (v) => { comp[key] = v; this._afterEdit(comp); });
@@ -815,6 +834,44 @@ export class Editor {
     inp.click();
   }
 
+  /**
+   * Открыть узловой редактор Blueprints.
+   * @param {object|null} comp — компонент Blueprint; если не задан, берётся
+   *   (или создаётся) компонент на выделенном объекте.
+   */
+  async openBlueprint(comp = null) {
+    let target = comp;
+    if (!target) {
+      if (!this.selected) { this.log('Сначала выберите объект', 'warn'); return; }
+      target = this.selected.getComponent('Blueprint');
+      if (!target) {
+        const Ctor = ComponentRegistry.get('Blueprint');
+        if (!Ctor) { this.log('Компонент Blueprint не зарегистрирован', 'err'); return; }
+        target = this.selected.addComponent(Ctor);
+        this.log(`Добавлен компонент Blueprint на «${this.selected.name}»`, 'ok');
+        this.refreshInspector();
+      }
+    }
+    if (!target.graph) target.compile();
+    try {
+      const { BlueprintEditor } = await import('./blueprint-editor.js');
+      this._bpEditor?.dispose();
+      this._bpEditor = new BlueprintEditor({
+        component: target,
+        host: this,
+        onClose: () => {
+          this._bpEditor = null;
+          this.refreshInspector();
+          this.log('Редактор блюпринтов закрыт');
+        },
+      }).mount(this.engine.container);
+      this.log(`Открыт блюпринт «${target.graphName}» (${target.graph?.stats.nodes ?? 0} узлов)`, 'ok');
+    } catch (e) {
+      this.log(`Не удалось открыть редактор блюпринтов: ${e}`, 'err');
+      console.error(e);
+    }
+  }
+
   async buildAPK() {
     const data = this._sceneData();
     this.log('Подготовка сборки APK…');
@@ -845,6 +902,8 @@ export class Editor {
   /* ==================== Закрытие ==================== */
   close() {
     if (this.isPlaying) this.togglePlay();
+    this._bpEditor?.dispose();
+    this._bpEditor = null;
     this.setSimulation(true);
     this.gizmo?.detach();
     this._gizmoHelper?.removeFromParent();
